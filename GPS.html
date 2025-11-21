@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GPS sencillo</title>
+
+  <!-- Estilos -->
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    button { padding: 0.6rem 1rem; margin-right: 0.5rem; }
+    .status { margin-top: 1rem; color: #333; }
+    #map { height: 360px; margin-top: 1rem; border: 1px solid #ccc; }
+  </style>
+
+  <!-- Leaflet CSS y JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <h2>🌍 Mi GPS en JavaScript</h2>
+
+  <!-- Botones -->
+  <button onclick="getLocation()">Obtener ubicación</button>
+  <button onclick="startWatch()">Iniciar seguimiento</button>
+  <button onclick="stopWatch()">Detener seguimiento</button>
+
+  <!-- Mensajes -->
+  <div class="status" id="status">Esperando acción...</div>
+  <div class="status" id="coords"></div>
+
+  <!-- Contenedor del mapa -->
+  <div id="map"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const coordsEl = document.getElementById('coords');
+
+    function showMessage(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function showCoords(latitude, longitude, accuracy) {
+      coordsEl.innerHTML = `
+        Latitud: ${latitude}<br>
+        Longitud: ${longitude}<br>
+        Precisión: ${Math.round(accuracy)} metros
+      `;
+    }
+
+    function handleError(err) {
+      const messages = {
+        1: 'Permiso denegado por el usuario.',
+        2: 'Posición no disponible.',
+        3: 'Tiempo de espera agotado.'
+      };
+      showMessage(`Error: ${messages[err.code] || 'Desconocido'} (${err.message})`);
+    }
+
+    // Inicializar mapa Leaflet
+    const map = L.map('map').setView([19.3, -99.5], 12); // Coordenadas iniciales (Estado de México)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let marker;
+    function updateMap(lat, lon) {
+      if (!marker) {
+        marker = L.marker([lat, lon]).addTo(map);
+      } else {
+        marker.setLatLng([lat, lon]);
+      }
+      map.setView([lat, lon], 16);
+    }
+
+    // Obtener ubicación una sola vez
+    function getLocation() {
+      if (!('geolocation' in navigator)) {
+        showMessage('Tu navegador no soporta geolocalización.');
+        return;
+      }
+
+      showMessage('Obteniendo ubicación...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          showMessage('Ubicación obtenida.');
+          showCoords(latitude, longitude, accuracy);
+          updateMap(latitude, longitude);
+        },
+        handleError,
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    // Seguimiento en tiempo real
+    let watchId = null;
+    function startWatch() {
+      if (!('geolocation' in navigator)) return showMessage('Geolocalización no disponible.');
+
+      showMessage('Seguimiento iniciado...');
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          showCoords(latitude, longitude, accuracy);
+          updateMap(latitude, longitude);
+        },
+        handleError,
+        { enableHighAccuracy: true, maximumAge: 1000 }
+      );
+    }
+
+    function stopWatch() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        showMessage('Seguimiento detenido.');
+      }
+    }
+  </script>
+</body>
+</html>
